@@ -1,0 +1,131 @@
+// THE REAL SCRIPT
+// ==UserScript==
+// @name     Parks Ont. Booker
+// @version  1
+// @namespace https://t3kbau5.com
+// @include https://reservations.ontarioparks.com/*
+// ==/UserScript==
+// Website: https://reservations.ontarioparks.com/create-booking/results?mapId=-2147483479&searchTabGroupId=0&bookingCategoryId=0&startDate=2021-06-22&endDate=2021-06-23&nights=1&isReserving=true&equipmentId=-32768&subEquipmentId=-32768&partySize=1&searchTime=2021-02-20T11:50:59.189&resourceLocationId=-2147483609
+// Has to be set up, in list view
+
+/* Config */
+// const refreshAt = new Date(2021, 0, 12, 18, 12, 0); // Jan 12, 2021 @ 07:00:01PM
+// const refreshAt = new Date(2021, 0, 13, 21, 49, 0)
+//const refreshAt = new Date(2021, 0, 14, 7, 0, 0) // month starts at 0, day starts at 1
+//const refreshAt = new Date(2021, 1, 22, 7, 0, 0) //Feb 22, 2021
+const refreshAt = new Date(2021, 1, 19, 23, 4, 0)
+
+// const sitesRegex = /2\d[0-9]/; // 20x, where x in range [0, 7]
+const sitesRegex = /300/;
+
+/* Functions */
+// Wait for the page to be ready before trying to do the main booking stuff
+function waitForPageLoad() {
+  if (document.getElementById('list-view-button') == null) {
+      console.log('Page not ready');
+      setTimeout(waitForPageLoad, 500);
+  } else {
+    // Ensure we're in list view
+  	document.getElementById('list-view-button').click();
+    waitForList();
+  }
+}
+
+// Once the page loads, the list might not have loaded yet. Wait for that, then carry on.
+function waitForList() {
+  if (document.getElementById('resource-name-0') == null) {
+    console.log('List not ready');
+    setTimeout(waitForList, 500);
+  } else {
+    performBooking();
+  }
+}
+
+function waitForReserve() {
+    console.log(document.getElementById('singleSiteCalendarButton-0'));
+    console.log(document.getElementById('reserveButtoon-2'));
+    console.log(document.getElementById('skipToContent'));
+    if (document.getElementById('reserveButton-2') == null) {
+        console.log(document.getElementsByClassName('button raised-btn mat-focus-indicator mat-raised-button mat-button-base mat-primary ng-star-inserted'))
+        console.log('Reserve not ready');
+    } else {
+        document.getElementById('reserveButton-2').click();
+    }
+}
+
+
+async function getSiteTime() {
+    let resp = await fetch('https://reservations.ontarioparks.com/')
+    let headers = Array.from(resp.headers);
+    for (let header of headers) {
+        if (header[0] == "date") {
+            let h = header[1];
+            let d = new Date(h);
+            return d
+        }
+    }
+}
+
+
+// The main booking action. Needs to be a function due to the async nature of
+// waiting for the page to be loaded.
+function performBooking() {
+  // Get list of all sites visible
+	var sites = document.querySelectorAll('[id^="resource-name-"]');
+	var found = false;
+
+  console.log(sites);
+	for (const site of sites) {
+    console.log(site.innerText);
+    const result = site.innerText.match(sitesRegex);
+    // Find a site that matches our desired pattern
+		if (result && result.length == 1) {
+      // Now make sure it's available
+      const siteIdx = site.id.match(/[^-]*$/)[0];
+      const siteAvailability = document.getElementById('availability-' + siteIdx).innerText;
+      console.log(siteAvailability);
+      if (siteAvailability.match(/\s*Available\s*/) != null) {
+        site.click();
+        found = true;
+        break;
+    	}
+		}
+    console.log('next');
+	}
+
+	if (found) {
+		setTimeout(waitForReserve(), 6000);
+	} else {
+		alert("No available sites!")
+	}
+}
+
+/* Main */
+async function main(){
+    console.log('Booker loaded');
+    const now = await getSiteTime();
+    if ((refreshAt.getTime() - now) > 3600000) {
+        alert("Refresh time too far away! Try again within 1hr of the desired time.");
+        return;
+    }
+
+    if (now >= refreshAt) {
+        console.log("Running Main Script");
+
+        // Wait for page load, then do the thing
+        waitForPageLoad();
+
+
+    } else {
+        console.log("Setting refresh for desired time");
+        const waitTime = refreshAt.getTime() - now;
+        setTimeout(() => {
+            window.location.reload(true);
+        }, waitTime);
+        console.log("Reload timer set, now just sit and wait :)");
+    }
+}
+
+
+
+main()
